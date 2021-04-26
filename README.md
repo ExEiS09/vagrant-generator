@@ -1,6 +1,6 @@
-# vagrant-generator
+# vault-generator
 
-Vagrant approle token generator.
+Vault approle token generator.
 
 Can be used for creating approles, policies, creating tokens and restict access to secrets.
 

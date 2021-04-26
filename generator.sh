@@ -2,10 +2,10 @@
 
 usage='
 
-    ./gen.sh --get-policies \"true\" --selected_policy \"policy_name"\ --show-id \"true\" --create-policy \"true\" --append \"true"\ --token-generate \"true\" --list-tokens \"true\" --revoke-token \"token\"
+    ./generator.sh --get-policies \"true\" --selected-policy \"policy_name"\ --show-id \"true\" --create-policy \"true\" --append \"true"\ --token-generate \"true\" --list-tokens \"true\" --revoke-token \"token\"
 
     --get-policies    - List all policies that exist in Vault Store
-    --selected_policy - Name of policy that require to be created or work with
+    --selected-policy - Name of policy that require to be created or work with
     --show-id         - Bool value. Return the vault_id and secret_id of policy.
     --create-policy   - Bool value. Required for creating new policies. Must be use with policy_name
     --append          - Appending path for secrets/list (for existing policies only)
@@ -35,7 +35,7 @@ do
           shift
           create_pol=$1
           ;;
-        --selected_policy)
+        --selected-policy)
           shift
           selected_pol=$1
           ;;
@@ -47,11 +47,11 @@ do
           shift
           token_gen=$1
           ;;
-        --list_tokens)
+        --list-tokens)
           shift
           list_tokens=$1
           ;;
-        --revoke_token)
+        --revoke-token)
           shift
           revoke_token=$1
           ;;
@@ -70,6 +70,7 @@ done
 if [[ -z "$VAULT_TOKEN" || -z "$VAULT_ADDR" ]]
     then
     echo -e "$usage"
+fi
 
 get_current_policies() {
 
@@ -82,13 +83,13 @@ work_with_policies() {
     if [[ $create_policy == "true" ]]
         then
             echo 'Creating New Policy with correct paths'
-            curl -XPOST --header "X-Vault-Token: $VAULT_TOKEN" --data '{"policy":"  path \"secret/data/$selected_pol\" {\n    capabilities = [\"create\", \"read\", \"update\", \"delete\", \"list\"]\n  }\n  path \"secret/+/\" {\n    capabilities = [\"read\", \"list\"]\n  }\n"}' $VAULT_ADDR/v1/sys/policy/$selected_pol
+            curl -XPOST --header "X-Vault-Token: $VAULT_TOKEN" --data '{"policy":"  path \"secret/data/'"$selected_pol"'\" {\n    capabilities = [\"create\", \"read\", \"update\", \"delete\", \"list\"]\n  }\n  path \"secret/+/\" {\n    capabilities = [\"read\", \"list\"]\n  }\n"}' $VAULT_ADDR/v1/sys/policy/$selected_pol
             echo 'Created Succesfully, generating approle...'
-            curl -XPOST --header "X-Vault-Token: $VAULT_TOKEN" --data '{"policies": "$selected_pol"}' $VAULT_ADDR/v1/auth/approle/role/$selected_pol
+            curl -XPOST --header "X-Vault-Token: $VAULT_TOKEN" --data '{"policies": "'"$selected_pol"'"}' $VAULT_ADDR/v1/auth/approle/role/$selected_pol
             echo 'AppRole Created Successfully, test generating Secret-ID...'
             curl -XPOST --header "X-Vault-Token: $VAULT_TOKEN" $VAULT_ADDR/v1/auth/approle/role/$selected_pol/secret-id
             echo 'Generating RO token...'
-            curl -XPOST --header "X-Vault-Token: $VAULT_TOKEN" --data '{ "policies":\"$selected_pol" }' $VAULT_ADDR/v1/auth/token/create | jq -r ".auth.client_token"
+            token=$(curl -XPOST --header "X-Vault-Token: $VAULT_TOKEN" --data '{ "policies":\"'"$selected_pol"'" }' $VAULT_ADDR/v1/auth/token/create | jq -r ".auth.client_token")
             echo 'Successfully done!'
             
             echo 'Current Role-ID'
@@ -100,9 +101,9 @@ work_with_policies() {
     if [[ $appender == "true" ]]
         then
             echo 'Append existing policy to work with RO token...'
-            curl -XPOST --header "X-Vault-Token: $VAULT_TOKEN" --data '{"policy":"  path \"secret/data/$selected_pol\" {\n    capabilities = [\"create\", \"read\", \"update\", \"delete\", \"list\"]\n  }\n  path \"secret/+/\" {\n    capabilities = [\"read\", \"list\"]\n  }\n"}' $VAULT_ADDR/v1/sys/policy/$selected_pol
+            curl -XPOST --header "X-Vault-Token: $VAULT_TOKEN" --data '{"policy":"  path \"secret/data/'"$selected_pol"'\" {\n    capabilities = [\"create\", \"read\", \"update\", \"delete\", \"list\"]\n  }\n  path \"secret/+/\" {\n    capabilities = [\"read\", \"list\"]\n  }\n"}' $VAULT_ADDR/v1/sys/policy/$selected_pol
             echo 'Generating RO token...'
-            curl -XPOST --header "X-Vault-Token: $VAULT_TOKEN" --data '{ "policies":\"$selected_pol" }' $VAULT_ADDR/v1/auth/token/create | jq -r ".auth.client_token"
+            token=$(curl -XPOST --header "X-Vault-Token: $VAULT_TOKEN" --data '{ "policies":"'"$selected_pol"'" }' $VAULT_ADDR/v1/auth/token/create | jq -r ".auth.client_token")
     fi
 
     if [[ $show_id == "true" ]]
@@ -120,7 +121,7 @@ work_with_tokens() {
     if [[ $token_gen == "true" ]]
         then
             echo 'Generating RO token...'
-            curl -XPOST --header "X-Vault-Token: $VAULT_TOKEN" --data '{ "policies":\"$selected_pol" }' $VAULT_ADDR/v1/auth/token/create | jq -r ".auth.client_token"
+            token=$(curl -XPOST --header "X-Vault-Token: $VAULT_TOKEN" --data '{ "policies":"'"$selected_pol"'" }' $VAULT_ADDR/v1/auth/token/create | jq -r ".auth.client_token")
             echo 'Successfully done!'
     fi
 
@@ -138,3 +139,4 @@ work_with_tokens() {
     fi
         work_with_policies
         work_with_tokens
+        printf "\n\t$selected_pol    :   $token\n\t" >> ./tokens.output
